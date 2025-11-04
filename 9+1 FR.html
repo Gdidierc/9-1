@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Encodage Cartes 9+1</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- ***** STYLES MIS À JOUR ***** -->
+  <style>
+    /* filepath: c:\Users\logiu\Desktop\9+1 FR\9+1 FR.html */
+    
+    /* * ==========================================
+     * MISE À JOUR VISUELLE
+     * ==========================================
+     */
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      
+      /* Couleurs mises à jour selon votre demande */
+      --primary: #00594E; /* Vert foncé */
+      --accent: #E56A54;  /* Saumon/Rouge */
+      --danger: #E56A54;  /* Utilisation de votre couleur pour les alertes */
+      
+      --muted:#ACB0BD;
+      --glass: rgba(0, 89, 78, 0.06); /* Basé sur le nouveau --primary */
+      --radius:12px;
+      --gap:16px;
+      --max-width:1200px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      height:100%; 
+      margin:0; 
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif; 
+      /* Fond légèrement ajusté pour s'accorder avec le vert */
+      background: linear-gradient(180deg, #f8fbff 0%, #f4f7f7 100%); 
+      color:#222;
+    }
+    .wrap{
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding:20px;
+      display:flex;
+      flex-direction:column;
+      align-items:center; /* centre horizontalement tout */
+      justify-content:flex-start; /* GARDE LE CONTENU EN HAUT PAR DÉFAUT */
+      min-height:calc(100vh - 40px);
+      gap:18px;
+    }
+
+    /* * SUPPRIMÉ : La classe .wrap.loaded qui poussait le contenu vers le bas 
+    * a été retirée pour le laisser en haut. 
+    */
+    
+    /* === NOUVEAUX STYLES DE BOUTONS === */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      white-space: nowrap;
+      
+      /* Style principal (plein) */
+      background-color: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 89, 78, 0.15);
+    }
+    
+    .btn:hover {
+      opacity: 0.85;
+      box-shadow: 0 6px 16px rgba(0, 89, 78, 0.2);
+    }
+    
+    .btn:disabled {
+      background-color: #e0e0e0;
+      color: #9e9e9e;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* Style "ghost" (contours) */
+    .btn.ghost {
+      background-color: transparent;
+      color: var(--primary);
+      border-color: #dde3e8;
+      box-shadow: none;
+    }
+    
+    .btn.ghost:hover {
+      background-color: var(--glass);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    
+    /* Ajustement pour les petits boutons */
+    .btn.small {
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      border-radius: 8px;
+    }
+    
+    /* * Override !important
+     * Nécessaire car le JS applique un style en ligne (que je ne peux pas changer)
+     */
+    #modalConfirm.btn {
+       background-color: var(--primary) !important;
+    }
+    #modalTuto.btn {
+      background-color: var(--danger) !important;
+      color: white !important;
+      border-color: transparent !important;
+    }
+    #modalCancel.btn.ghost {
+      color: #555;
+    }
+
+    /* === FIN DES NOUVEAUX STYLES DE BOUTONS === */
+
+
+    /* Topbar empilée et centrée (bouton de chargement sous le titre) */
+    .topbar{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      width:100%;
+      margin-bottom:8px;
+      text-align:center;
+    }
+    
+    /* Styles du logo et titre mis à jour */
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      font-size: 2rem;
+      font-weight: 800;
+      color: white;
+      background: var(--primary);
+      border-radius: 10px;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .topbar h1 {
+      color: var(--primary);
+      margin: 0 0 4px 0;
+      font-size: 1.75rem;
+    }
+
+    /* Top actions centrées et sans alignement à droite */
+    .top-actions{display:flex; gap:10px; align-items:center; justify-content:center; width:100%;}
+
+    /* Layout principal : grid responsive */
+    .main-grid{display:grid; grid-template-columns:1fr; gap:var(--gap); align-items:center; justify-items:center; width:100%;}
+    @media (max-width:980px){ .main-grid{grid-template-columns:1fr;} .top-actions{flex-wrap:wrap;} }
+
+    /* Card style */
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:18px;
+      box-shadow:0 6px 20px rgba(14,34,58,0.04);
+      border: 1px solid #f0f3f6; /* Légère bordure */
+      width:100%;
+      max-width:920px; /* carte centrée et compacte */
+    }
+
+    /* Form styles */
+    label{display:block; font-size:0.85rem; color:var(--primary); margin-bottom:6px; font-weight:600;}
+    input[type="text"], input[type="date"], textarea, select {
+      width:100%; padding:12px 12px; border-radius:10px; border:1px solid #e6e9ef; font-size:0.95rem;
+      background:linear-gradient(180deg,#fff,#fbfcff);
+      transition:box-shadow .15s, border-color .15s;
+    }
+    input:focus, textarea:focus, select:focus { 
+      outline:none; 
+      border-color:var(--primary); 
+      box-shadow:0 0 0 3px var(--glass); /* Ombre de focus mise à jour */
+    }
+    textarea{min-height:80px; resize:vertical; padding:10px;}
+    .row{display:flex; gap:12px;}
+    .col{flex:1;}
+
+    /* Compact input + search button */
+    .input-with-search-btn{display:flex; gap:8px; align-items:center;}
+    .input-with-search-btn input{flex:1; margin:0;}
+    .icon-btn{width:44px; height:44px; padding:0; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:1.1rem; border:0; cursor:pointer;}
+    .icon-btn.search{
+      background: var(--primary); /* Bouton recherche mis à jour */
+      color: white;
+      border: 1px solid var(--primary);
+    }
+    .icon-btn.search:hover {
+      opacity: 0.9;
+    }
+    .small{font-size:0.9rem; padding:8px 10px; border-radius:8px;}
+
+    /* Statut & hint */
+    #statutChargement{font-weight:600; color:var(--accent); font-size:0.95rem;}
+    #statutAvantCommencer{
+      margin-top:12px; 
+      padding:12px; /* Plus d'espace */
+      border-radius:10px; 
+      background: #fff4f2; /* Fond pour la couleur saumon */
+      border:1px solid var(--danger); /* Bordure saumon */
+      color: #bf4a36; /* Texte plus foncé pour contraste */
+      font-weight:600; 
+      text-align:center;
+    }
+
+    /* Table */
+    table{width:100%; border-collapse:collapse; font-size:0.95rem;}
+    th, td{padding:10px 12px; text-align:left; border-bottom:1px solid #F0F2F6;}
+    thead th{background:transparent; color:var(--muted); font-weight:700; font-size:0.85rem;}
+    tbody tr:hover{background: #f7fcfb; } /* Survol de ligne vert très clair */
+    .comment-cell textarea{min-height:56px;}
+
+    /* Actions panel (right) */
+    .actions-panel{display:flex; flex-direction:column; gap:12px;}
+    .actions-panel h3{margin:0; color:var(--primary);}
+    .chip{display:inline-flex; gap:8px; align-items:center; padding:8px 10px; border-radius:999px; background:#f4f7fb; font-weight:600; color:var(--primary);}
+
+    /* Popup recherche */
+    .popup{position:fixed; top:8%; left:50%; transform:translateX(-50%); width:95%; max-width:980px; max-height:80%; overflow:auto; z-index:1050; border-radius:12px; display:none;}
+    .popup .card{margin:0; padding:14px; box-shadow: 0 10px 40px rgba(0,0,0,0.15);} /* Ombre plus forte */
+    .popup-header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
+    .popup-header h3 { color: var(--primary); } /* Titre popup mis à jour */
+    #tableRecherche{width:100%; border-collapse:collapse;}
+    #tableRecherche th, #tableRecherche td{padding:8px 10px; border-bottom:1px solid #eef3fb; font-size:0.9rem;}
+    #tableRecherche tbody tr{cursor:pointer;}
+    #tableRecherche tbody tr:hover{background: #f0fafa; } /* Survol popup mis à jour */
+
+    /* Modal */
+    #customModal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0, 89, 78, 0.35); z-index:1200;} /* Fond modal mis à jour */
+    #customModal > div{width:90%; max-width:620px; border-radius:12px; padding:18px; background:var(--card); box-shadow:0 18px 60px rgba(11,57,72,0.14);}
+    #modalActions{display:flex; justify-content:flex-end; gap:10px; margin-top:14px;}
+    #modalMessage{color:#333; font-size:0.95rem; line-height:1.4;}
+    #modalTitle { color: var(--primary); } /* Titre modal mis à jour */
+
+    /* Misc */
+    .muted{color:#6b7280; font-size:0.9rem;}
+    .flex-between{display:flex; justify-content:space-between; align-items:center;}
+    .hidden-content{display:none;}
+    .table-card .table-wrap{overflow:auto; max-height:420px; padding-top:6px;}
+    .footer-note{font-size:0.85rem; color:#6b7280; text-align:center; margin-top:12px;}
+    
+    /* Styles pour le formulaire d'édition dans la modale */
+    .edit-form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .edit-form-row > div { flex: 1; }
+    #modalContent label { font-size: 0.8rem; margin-bottom: 4px; }
+    #modalContent input { padding: 10px; }
+
+  </style>
+  <!-- ***** FIN DES STYLES ***** -->
+</head>
+<body onload="chargerInfosMagasin()">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+
+        <div>
+          <h1>Encodage Cartes 9+1</h1>
+
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <!-- input file caché (conservé) -->
+        <input type="file" id="fichierExcel" accept=".xlsx, .xls" onchange="chargerExcel()" style="display:none;">
+        <button id="btnLancerChargement" class="btn" onclick="document.getElementById('fichierExcel').click()">📥 Charger la base</button>
+        <div style="min-width:160px; text-align:left; padding-left: 10px;">
+          <div id="statutChargement" style="display:block; font-weight:700;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Colonne gauche : formulaire -->
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <strong style="color:var(--primary); font-size:1rem;">Détails du magasin & encodage</strong>
+          <div class="muted">Remplissez avant d'ajouter</div>
+        </div>
+
+        <div id="statutAvantCommencer">Charger la base de données avant de commencer</div>
+
+        <div id="contentToHide" class="hidden-content" style="margin-top:14px;">
+          <div style="margin-bottom:12px;">
+            <label for="societeNom">Nom de la société</label>
+            <input type="text" id="societeNom" placeholder="Ex: ABC Retail Group">
+          </div>
+
+          <div class="row" style="margin-bottom:12px;">
+            <div class="col">
+              <label for="magasinNom">Nom du magasin</label>
+              <input type="text" id="magasinNom" placeholder="Ex: MonMagasin - Bruxelles">
+            </div>
+            <div class="col">
+              <label for="magasinCode">Code magasin</label>
+              <input type="text" id="magasinCode" placeholder="Ex: M101">
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <button class="btn ghost small" onclick="sauvegarderInfosMagasin()">💾 Enregistrer infos magasin</button>
+          </div>
+
+          <hr style="border:none; height:1px; background:#f1f5f9; margin:14px 0;">
+
+          <!-- Champ commentaire (maintenant visible par défaut mais vide) -->
+          <div style="margin-bottom:8px;">
+            <label for="inputCommentaire">Commentaire (optionnel)</label>
+            <input type="text" id="inputCommentaire" placeholder="Ajoutez un commentaire..." onkeyup="checkEnter(event,'commentaire')" style="display: block;">
+            <!-- Le bouton pour afficher/cacher n'est plus nécessaire si on le laisse visible -->
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label for="codeGold">Code GOLD (sélectionné)</label>
+            <div class="input-with-search-btn">
+              <input type="text" id="codeGold" placeholder="Cliquez sur Rechercher pour sélectionner" inputmode="numeric" pattern="[0-9]*">
+              <button id="btnRecherche" class="icon-btn search" onclick="ouvrirRecherche()" title="Rechercher un article">🔍</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label for="codeTicket">Code barre du ticket</label>
+            <input type="text" id="codeTicket" placeholder="Saisir le code ticket" inputmode="numeric" pattern="[0-9]*" onkeyup="checkEnter(event, 'ticket')">
+          </div>
+
+
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button id="btnAdd" class="btn" onclick="ajouterLigne()">➕ Ajouter</button>
+            <button class="btn ghost small" onclick="resetTable()">♻️ Réinitialiser</button>
+            <div style="flex:1"></div>
+            <div class="muted" style="font-size:0.9rem;">Astuce : scanner → Entrée pour ajouter</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Colonne droite : tableau & actions -->
+      <div class="card table-card hidden-content" id="tableToHide">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <h3 style="margin:0; color:var(--primary);">Encodage en cours</h3>
+          <!-- SUPPRESSION DU COMPTEUR DE SÉLECTION -->
+        </div>
+        
+        <!-- Changement : Suppression de la case à cocher globale dans l'en-tête,
+             Remplacement par le bouton "Tout sélectionner" ci-dessous -->
+        <div class="table-wrap" style="margin-bottom:12px;">
+          <table id="tableau" aria-label="Tableau d'encodage">
+            <thead>
+              <tr>
+                <!-- La case à cocher de l'en-tête est retirée -->
+                <th>Date</th>
+                <th>Société</th>
+                <th>Nom Magasin</th>
+                <th>Code Magasin</th>
+                <th>Code GOLD</th>
+                <th>Code ticket</th>
+                <th>Commentaire</th>
+                <th style="width:70px; text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="actions-panel">
+           <!-- Panneau d'actions réorganisé -->
+          <div style="display:flex; gap:8px;">
+            <button id="btnEnvoyer" class="btn" onclick="envoyerFichier()">📧 Envoyer</button>
+            <div style="flex: 1;"></div>
+            <!-- SUPPRESSION DES BOUTONS EDIT ET DELETE DE MASSE -->
+          </div>
+
+          <!-- SUPPRESSION DU BOUTON TOUT SÉLECTIONNER -->
+
+          <div class="muted footer-note">Les modifications peuvent être faites via ✏️ sur chaque ligne.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px; text-align:center;" class="muted">© 9+1 Encodage — Interface repensée</div>
+  </div>
+
+  <!-- POPUP RECHERCHE (inchangée en logique, re-stylée via CSS ci-dessus) -->
+  <div class="popup" id="popupRecherche">
+    <div class="card">
+      <div class="popup-header">
+        <h3 style="margin:0;">🔍 Rechercher un article</h3>
+        <div style="display:flex; gap:8px;">
+          <button class="btn ghost small" onclick="fermerRecherche()">❌ Fermer</button>
+        </div>
+      </div>
+      <div style="overflow:auto;">
+        <table id="tableRecherche">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal personnalisé -->
+  <div id="customModal">
+      <div>
+          <h4 id="modalTitle"></h4>
+          <p id="modalMessage"></p>
+          <div id="modalContent" style="margin-top:12px;"></div>
+          <div id="modalActions">
+              <!-- Le bouton Tuto est stylé via CSS avec !important -->
+              <button id="modalTuto" class="btn secondary" style="display:none;">Comment faire ?</button>
+              <button id="modalCancel" class="btn ghost">Retour</button>
+              <!-- Le bouton Confirm est stylé via CSS avec !important -->
+              <button id="modalConfirm" class="btn">OK</button>
+          </div>
+      </div>
+  </div>
+
+  <!-- 
+    =================================================
+    CHANGEMENTS DANS LE SCRIPT CI-DESSOUS
+    =================================================
+    MODIFICATION: Suppression de l'ajout de la classe 'loaded'
+  -->
+  <script>
+    let encodage = [];
+    let articles = [];
+    
+    // MODIFICATION 1 : Suppression de la duplication 'LIBELÉ CAISSE FR' et placement de NL à côté
+    const REQUIRED_HEADERS_NORMALIZED = [
+        'GOLD', 'EAN', 'LIBELLE', 'MARQUE', 'PG', 'POID', 'FLOW', 
+        'LIBELLÉ CAISSE FR', 'LIBELLÉ CAISSE NL', 'CATEGORY DESCRIPTION'
+    ];
+    let headers = []; 
+    
+    const BASE_EXCEL_FILENAME = 'base.xlsx';
+    
+    // Constantes pour localStorage
+    const LS_SOCIETE = 'societeNom';
+    const LS_MAGASIN_NOM = 'magasinNom';
+    const LS_MAGASIN_CODE = 'magasinCode';
+
+    // Variable pour stocker le nom du fichier généré temporairement, utilisée par showTutoModal
+    let lastGeneratedFileName = ''; 
+    
+    // Fonction utilitaire pour obtenir la date au format YYYY-MM-DD
+    function getDateDuJour() {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        // Les mois commencent à 0
+        const mm = String(today.getMonth() + 1).padStart(2, '0'); 
+        const dd = String(today.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    // Nouvelle fonction pour l'ajout automatique par scanner (touche Entrée)
+    // MODIFIÉ : Ajout du paramètre 'field' pour différencier les actions
+    function checkEnter(event, field) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Empêche l'action par défaut
+            if (field === 'ticket') {
+                // Si Entrée sur le ticket, on bascule/ouvre le champ commentaire.
+                const commentInput = document.getElementById('inputCommentaire');
+                const commentValue = commentInput.value.trim();
+
+                // On ajoute toujours la ligne, que le commentaire soit vide ou non
+                // C'est le flux le plus rapide. L'utilisateur peut scanner, taper commentaire, scanner.
+                ajouterLigne();
+
+            } else if (field === 'commentaire') {
+                // Si Entrée sur le commentaire, on ajoute la ligne
+                ajouterLigne();
+                // On ramène le focus au ticket
+                document.getElementById("codeTicket").focus(); 
+            }
+        }
+    }
+    
+    // NOUVELLE FONCTION pour basculer la visibilité du champ commentaire (Non utilisée si champ visible par défaut)
+    function toggleCommentaireInput(forceOpen = false) {
+        const input = document.getElementById('inputCommentaire');
+        // const btn = document.getElementById('btnToggleCommentaire'); (Bouton supprimé)
+
+        if (input.style.display === 'none' || forceOpen) {
+            input.style.display = 'block';
+        } else if (!forceOpen && input.value.trim() === '') {
+            // Cache seulement si le champ est vide et pas de forceOpen
+            input.style.display = 'none';
+        }
+        
+        // (Logique du bouton supprimée)
+    }
+    
+    // NOUVELLE FONCTION pour cacher le champ commentaire (Non utilisée si champ visible par défaut)
+    function hideCommentaireInputIfEmpty() {
+        const input = document.getElementById('inputCommentaire');
+        // const btn = document.getElementById('btnToggleCommentaire');
+        if (input.value.trim() === '') {
+            input.style.display = 'none';
+            // btn.classList.remove('has-comment');
+        } else {
+            // btn.classList.add('has-comment');
+        }
+    }
+
+
+    // === Utilitaires d'activation/désactivation (affichage) ===
+    function setContentVisibility(visible) {
+        const contentDiv = document.getElementById("contentToHide");
+        const tableDiv = document.getElementById("tableToHide");
+        const statusDiv = document.getElementById("statutAvantCommencer");
+        const wrap = document.querySelector('.wrap');
+        
+        if (visible) {
+            contentDiv.classList.remove('hidden-content');
+            tableDiv.classList.remove('hidden-content');
+            statusDiv.style.display = 'none';
+            // SUPPRESSION DE LA LIGNE SUIVANTE POUR GARDER LE CONTENU EN HAUT
+            // if (wrap) wrap.classList.add('loaded'); 
+        } else {
+            contentDiv.classList.add('hidden-content');
+            tableDiv.classList.add('hidden-content');
+            statusDiv.style.display = 'block';
+            if (wrap) wrap.classList.remove('loaded');
+        }
+    }
+    
+    // Masque le contenu d'encodage et le tableau au chargement initial
+    document.addEventListener('DOMContentLoaded', () => {
+        setContentVisibility(false);
+        // Initialise le champ commentaire comme visible par défaut
+        try { document.getElementById('inputCommentaire').style.display = 'block'; } catch(e){/* no comment input */ }
+
+        // Nouvelle précharge de la base (JSON ou fallback Excel)
+        preloadBase();
+    });
+
+    // === Gestion des infos Magasin (LocalStorage) ===
+    function sauvegarderInfosMagasin() {
+        const societe = document.getElementById(LS_SOCIETE).value.trim();
+        const nom = document.getElementById(LS_MAGASIN_NOM).value.trim();
+        const code = document.getElementById(LS_MAGASIN_CODE).value.trim();
+
+        if (!societe || !nom || !code) {
+            return showModal("Alerte", "Veuillez remplir les trois champs (Société, Nom du magasin, Code magasin) avant d'enregistrer.");
+        }
+
+        try {
+            localStorage.setItem(LS_SOCIETE, societe);
+            localStorage.setItem(LS_MAGASIN_NOM, nom);
+            localStorage.setItem(LS_MAGASIN_CODE, code);
+            showModal("Information", "Informations du magasin enregistrées !");
+        } catch (e) {
+            console.error("Erreur lors de la sauvegarde locale:", e);
+            showModal("Erreur", "Erreur lors de la sauvegarde des informations du magasin. Veuillez vérifier les permissions de votre navigateur.");
+        }
+    }
+
+    function chargerInfosMagasin() {
+        try {
+            document.getElementById(LS_SOCIETE).value = localStorage.getItem(LS_SOCIETE) || "";
+            document.getElementById(LS_MAGASIN_NOM).value = localStorage.getItem(LS_MAGASIN_NOM) || "";
+            document.getElementById(LS_MAGASIN_CODE).value = localStorage.getItem(LS_MAGASIN_CODE) || "";
+        } catch (e) {
+            console.warn("Impossible de charger les informations locales. L'encodage continuera.");
+        }
+    }
+
+
+    // === Modal personnalisé (Remplace alert et confirm) ===
+    // nouvelle aide pour revenir au contexte principal après confirmation
+function afterConfirmFocus() {
+	// Réaffiche le contenu principal si nécessaire
+	try { setContentVisibility(true); } catch (e) { /* ignore */ }
+	// Donne le focus au champ ticket si présent
+	const ticket = document.getElementById("codeTicket");
+	if (ticket) try { ticket.focus(); } catch(e) {}
+}
+
+// Remplace showModal pour gérer proprement les callbacks sync/async et garantir la fermeture
+function showModal(title, message, callback = null, cancelable = true, confirmText = 'OK', tutoVisible = false, preserveContent = false) {
+	const modal = document.getElementById('customModal');
+	const confirmBtn = document.getElementById('modalConfirm');
+	const cancelBtn = document.getElementById('modalCancel');
+	const tutoBtn = document.getElementById('modalTuto'); // Ajouté pour le bouton tuto
+	const modalContent = document.getElementById('modalContent');
+
+	document.getElementById('modalTitle').textContent = title;
+	document.getElementById('modalMessage').innerHTML = message;
+
+	if (!preserveContent && modalContent) modalContent.innerHTML = '';
+
+	// Configuration du bouton Tuto
+	tutoBtn.style.display = tutoVisible ? 'block' : 'none';
+	tutoBtn.onclick = () => {
+		closeModal();
+		showTutoModal(lastGeneratedFileName);
+	};
+
+	if (callback === null) {
+		// Mode alerte simple
+		cancelBtn.style.display = 'none';
+		confirmBtn.style.display = 'block';
+		confirmBtn.textContent = 'OK';
+		confirmBtn.onclick = () => { closeModal(); afterConfirmFocus(); };
+		// confirmBtn.style.backgroundColor = '#0B3948'; (Géré par CSS)
+		confirmBtn.focus();
+	} else {
+		// Mode confirmation/action
+		cancelBtn.style.display = cancelable ? 'block' : 'none';
+		confirmBtn.style.display = 'block';
+		cancelBtn.textContent = 'Retour';
+		confirmBtn.textContent = confirmText;
+		// confirmBtn.style.backgroundColor = '#0B3948'; (Géré par CSS)
+
+		confirmBtn.onclick = () => {
+			try {
+				const result = callback();
+				// si callback retourne une promesse, attendre sa résolution avant de fermer
+				if (result && typeof result.then === 'function') {
+					result.then(() => {
+						closeModal();
+						afterConfirmFocus();
+					}).catch(() => {
+						// en cas d'erreur, fermer quand même mais signaler éventuellement
+						closeModal();
+						afterConfirmFocus();
+					});
+				} else {
+					// synchrone
+					closeModal();
+					afterConfirmFocus();
+				}
+			} catch (e) {
+				// fermer proprement même en cas d'erreur
+				console.error(e);
+				closeModal();
+				afterConfirmFocus();
+			}
+		};
+		cancelBtn.onclick = () => { closeModal(); };
+		confirmBtn.focus();
+	}
+
+	modal.style.display = 'flex';
+}
+
+    function closeModal() {
+        const modal = document.getElementById('customModal');
+        if (!modal) return;
+
+        // Cacher la modal
+        modal.style.display = 'none';
+
+        // Vider le contenu du modal pour éviter la réapparition du formulaire précédent
+        const modalContent = document.getElementById('modalContent');
+        if (modalContent) modalContent.innerHTML = '';
+
+        // Réinitialiser les textes et handlers des boutons pour un état propre
+        const tutoBtn = document.getElementById('modalTuto');
+        const confirmBtn = document.getElementById('modalConfirm');
+        const cancelBtn = document.getElementById('modalCancel');
+
+        if (tutoBtn) {
+            tutoBtn.style.display = 'none';
+            tutoBtn.textContent = 'Comment faire ?';
+            tutoBtn.onclick = null;
+            tutoBtn.style.backgroundColor = ''; // remet le style par défaut
+        }
+        if (confirmBtn) {
+            confirmBtn.onclick = null;
+            confirmBtn.textContent = 'OK';
+            confirmBtn.style.backgroundColor = '';
+        }
+        if (cancelBtn) {
+            cancelBtn.onclick = null;
+            cancelBtn.style.display = 'block';
+            cancelBtn.textContent = 'Retour';
+            cancelBtn.style.backgroundColor = '';
+        }
+
+        // Nettoyer aussi le message et le titre (optionnel, visuel propre)
+        const modalMsg = document.getElementById('modalMessage');
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalMsg) modalMsg.innerHTML = '';
+        if (modalTitle) modalTitle.textContent = '';
+    }
+    window.alert = (message) => showModal("Information", message, null);
+    
+    /**
+     * Affiche le tutoriel des étapes d'envoi et offre le bouton d'envoi direct.
+     * MODIFIÉ : Ajout du bouton 'Envoyer 📧' dans cette modale.
+     */
+    function showTutoModal(fileName) {
+        const tutoMessage = `
+            <b style="color:#00594E;">Tutoriel : Procédure d'envoi</b>
+            <hr style="margin: 10px 0;">
+            
+            1. ⬇️ <b style="color:red;">Téléchargement :</b> Le fichier Excel est déjà téléchargé (nommé '${fileName}').
+            <br><br>
+            2. 📧 <b style="color:#E56A54;">Ouverture de l'email :</b> Cliquez sur le bouton "Envoyer 📧" ci-dessous pour ouvrir votre client de messagerie.
+            <br><br>
+            3. 📎 <b style="color:#00594E;">ACTION CRUCIALE :</b> Vous devez <b style="color:red;">manuellement joindre le fichier Excel</b> que vous venez de télécharger à cet email.
+            <br><br>
+            4. ✅ <b style="color:green;">Finaliser :</b> Une fois le fichier attaché, vous pouvez envoyer l'email au Service Desk.
+        `;
+        
+        // Mode Confirmation : offre "Retour" ou "Envoyer 📧"
+        // Le callback appelle ouvrirClientMail()
+        showModal(
+            "Aide : Procédure d'envoi", 
+            tutoMessage, 
+            () => ouvrirClientMail(fileName), // Callback qui ouvre le client mail
+            true, // Bouton Retour visible
+            'Envoyer 📧', // Bouton d'action (Confirmation)
+            false // Bouton Tuto masqué
+        ); 
+    }
+
+
+    // Fonction utilitaire pour normaliser les clés
+    function normalizeKey(key) {
+        let normalized = String(key)
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase()
+            .trim();
+        // Retire les caractères non alphanumériques, y compris les espaces, pour l'identification des colonnes.
+        return normalized.replace(/[^A-Z0-9]/g, ''); 
+    }
+    
+    // Fonction de traitement des données Excel 
+    async function processExcelData(data, fileName) {
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        
+        if (json.length === 0) {
+             document.getElementById('statutChargement').textContent = `❌ Fichier ${fileName} vide.`;
+             document.getElementById('statutChargement').style.color = '#E56A54';
+             setContentVisibility(false);
+             return showModal("Erreur", "Le fichier Excel est vide.");
+        }
+
+        const allHeaders = Object.keys(json[0]);
+        const normalizedAllHeaders = allHeaders.map(normalizeKey);
+        
+        // 1. Déterminer les en-têtes à utiliser
+        headers = [];
+        const headerMap = {};
+
+        REQUIRED_HEADERS_NORMALIZED.forEach(reqHeader => {
+            // Normalise le header requis pour la recherche. Ex: "LIBELLE CAISSE FR" -> "LIBELLÉCAISSEFR"
+            const normalizedReq = normalizeKey(reqHeader);
+            
+            // On cherche la PREMIÈRE colonne dans le fichier Excel qui correspond au header requis
+            const index = normalizedAllHeaders.findIndex(h => h.includes(normalizedReq));
+            
+            if (index !== -1) {
+                const originalHeader = allHeaders[index];
+                
+                // Vérifie si cet en-tête n'a pas déjà été ajouté (pour éviter les doublons accidentels dans le tableau headers)
+                if (!headers.includes(originalHeader)) {
+                    headers.push(originalHeader);
+                    headerMap[normalizedReq] = originalHeader;
+                }
+            } else {
+                console.warn(`Colonne requise '${reqHeader}' (normalisée: ${normalizedReq}) non trouvée.`);
+            }
+        });
+        
+        // On s'assure que 'LIBELLÉ CAISSE FR' et 'LIBELLÉ CAISSE NL' sont côte à côte
+        const frIndex = headers.findIndex(h => normalizeKey(h).includes(normalizeKey('LIBELLÉ CAISSE FR')));
+        const nlIndex = headers.findIndex(h => normalizeKey(h).includes(normalizeKey('LIBELLÉ CAISSE NL')));
+        
+        if (frIndex !== -1 && nlIndex !== -1 && Math.abs(frIndex - nlIndex) !== 1) {
+             // Si les deux existent mais ne sont pas adjacents, on les déplace pour être à côté
+             const frHeader = headers[frIndex];
+             const nlHeader = headers[nlIndex];
+             
+             // Suppression des deux à leurs positions actuelles
+             headers.splice(Math.max(frIndex, nlIndex), 1);
+             headers.splice(Math.min(frIndex, nlIndex), 1);
+             
+             // Insertion après 'FLOW' (pour les mettre ensemble à la fin des colonnes de base)
+             const flowIndex = headers.findIndex(h => normalizeKey(h).includes(normalizeKey('FLOW')));
+             
+             if (flowIndex !== -1) {
+                 headers.splice(flowIndex + 1, 0, frHeader, nlHeader);
+             } else {
+                 // Si FLOW n'existe pas, on les met à la fin
+                 headers.push(frHeader, nlHeader);
+             }
+        }
+        
+        const goldKey = headerMap[normalizeKey('GOLD')];
+        
+        if (!goldKey) { 
+            document.getElementById('statutChargement').textContent = `❌ Colonne 'GOLD' manquante(s) dans ${fileName}.`;
+            document.getElementById('statutChargement').style.color = '#E56A54';
+            setContentVisibility(false);
+            return console.error(`Colonne manquante: GOLD.`);
+        }
+
+        // 2. Transformer les données
+        articles = json.map(row => {
+            const article = { ...row };
+            article.GOLD_DISPLAY = row[goldKey] || "";
+            return article;
+        });
+        
+        // 3. Afficher le statut de succès et le contenu du formulaire
+        document.getElementById('statutChargement').textContent = `✅ ${articles.length} articles chargés (${fileName})`;
+        document.getElementById('statutChargement').style.color = '#00594E';
+        // On masque le bouton de chargement après succès pour éviter la confusion
+        document.getElementById('btnLancerChargement').style.display = 'none'; 
+        
+        setContentVisibility(true);
+        
+        console.log(`✅ ${articles.length} articles chargés. Colonnes utilisées : ${headers.join(', ')}`);
+    }
+
+    // === Chargement Excel MANUEL/SÉCURISÉ ===
+    async function chargerExcel() {
+    const input = document.getElementById("fichierExcel");
+    if (!input.files.length) {
+        document.getElementById('statutChargement').textContent = `(Sélection annulée)`;
+        document.getElementById('statutChargement').style.color = '#E56A54';
+        if (articles.length > 0) setContentVisibility(true);
+        return;
+    }
+    
+    const file = input.files[0];
+
+    try {
+        document.getElementById('statutChargement').textContent = `(Traitement de '${file.name}'...)`;
+        document.getElementById('statutChargement').style.color = '#E56A54';
+        setContentVisibility(false);
+        
+        const data = await file.arrayBuffer();
+        await processExcelData(data, file.name);
+
+        // reset input so same file can be reselected later
+        input.value = '';
+    } catch (error) {
+        console.error("Erreur lors du traitement du fichier Excel:", error);
+        showModal("Erreur de Traitement", "Erreur lors du traitement du fichier. Assurez-vous qu'il est au bon format.");
+        document.getElementById('statutChargement').textContent = `❌ Échec du chargement. Réessayez.`;
+        document.getElementById('statutChargement').style.color = '#E56A54';
+        setContentVisibility(false);
+    }
+}
+    
+    // === Encodage ===
+    function ajouterLigne() {
+      // 1. Récupération des infos Magasin (même si non sauvegardées, on utilise les valeurs actuelles)
+      const societe = document.getElementById(LS_SOCIETE).value.trim();
+      const nomMagasin = document.getElementById(LS_MAGASIN_NOM).value.trim();
+      const codeMagasin = document.getElementById(LS_MAGASIN_CODE).value.trim();
+
+      if (!societe || !nomMagasin || !codeMagasin) {
+          return showModal("Alerte", "Veuillez remplir les informations du magasin (Société, Nom et Code Magasin) avant d'ajouter une ligne.");
+      }
+
+      // 2. Récupération des infos Article/Ticket/Commentaire
+      const code = document.getElementById("codeGold").value.trim();
+      const ticket = document.getElementById("codeTicket").value.trim();
+      // NOUVEAU: On récupère le commentaire du champ visible
+      const commentaire = document.getElementById("inputCommentaire").value.trim(); 
+
+      // Vérification des inputs pour s'assurer que ce sont bien des chiffres
+      if (!/^\d*$/.test(code) || !/^\d*$/.test(ticket)) {
+          return showModal("Alerte", "Les champs Code GOLD et Code ticket doivent contenir uniquement des chiffres.");
+      }
+      
+      if (articles.length === 0) return showModal("Alerte", "Veuillez charger la base Excel.");
+      if (!code) return showModal("Alerte", "Veuillez d'abord rechercher et sélectionner un Code GOLD."); 
+      if (!ticket) return showModal("Alerte", "Merci de remplir le champ Code ticket.");
+      
+      // NOUVEAU : Récupération de la date du jour
+      const dateEncodage = getDateDuJour();
+      
+      // 3. Stockage de la ligne complète (avec date et commentaire)
+      encodage.push({ 
+          date: dateEncodage, // NOUVEAU
+          societe, 
+          nomMagasin, 
+          codeMagasin, 
+          code, 
+          ticket, 
+          commentaire // NOUVEAU
+      }); 
+      
+      // 4. Réinitialisation des champs de l'article pour la prochaine ligne
+      document.getElementById("codeGold").value = "";
+      document.getElementById("codeTicket").value = "";
+      document.getElementById("inputCommentaire").value = ""; // Vider le commentaire
+      
+      afficherTableau();
+
+      // IMPORTANT: Remettre le focus sur le champ Code ticket pour l'encodage continu au scanner
+      document.getElementById("codeTicket").focus();
+    }
+    
+    // NOUVELLE FONCTION : Mettre à jour le commentaire directement depuis le textarea du tableau
+    function updateComment(index, newComment) {
+        if (encodage[index]) {
+            encodage[index].commentaire = newComment.trim();
+            console.log(`Commentaire ligne ${index} mis à jour.`);
+        }
+    }
+
+    // SUPPRESSION DES FONCTIONS DE SÉLECTION (updateButtons, selectAll, editSelected, deleteSelected)
+
+    function afficherTableau() {
+      const tbody = document.querySelector("#tableau tbody");
+      tbody.innerHTML = "";
+
+      encodage.forEach((ligne, index) => {
+        const row = document.createElement("tr");
+        row.dataset.index = index;
+        
+        // SUPPRESSION de la case à cocher pour la sélection multiple
+        row.innerHTML = `
+          <td>${ligne.date}</td>
+          <td>${ligne.societe}</td>
+          <td>${ligne.nomMagasin}</td>
+          <td>${ligne.codeMagasin}</td>
+          <td>${ligne.code}</td>
+          <td>${ligne.ticket}</td>
+          <td class="comment-cell">
+            <textarea 
+              onchange="updateComment(${index}, this.value)" 
+              placeholder="Ajouter un commentaire..."
+              rows="1"
+              style="width: 100%; min-height: 40px; padding: 5px; border-radius: 6px; border: 1px solid #e0e0e0;"
+            >${ligne.commentaire || ''}</textarea>
+          </td>
+          <td style="padding: 5px; text-align: center; width: 50px;">
+            <button 
+              onclick="modifierLigne(${index})" 
+              class="btn ghost small"
+              style="width: 38px; height: 38px; padding: 0; font-size: 1.1em; margin: 0;"
+              title="Modifier cette ligne"
+            >✏️</button>
+          </td>
+        `;
+
+        tbody.appendChild(row);
+      });
+
+      // SUPPRESSION de l'appel à updateButtons()
+    }
+
+    // NOUVELLE FONCTION: éditer une ligne encodée
+    function modifierLigne(index) {
+        const item = encodage[index];
+        if (!item) return showModal("Erreur", "Ligne introuvable.");
+
+        // Construire le formulaire HTML dans le modalContent
+        const mc = document.getElementById('modalContent');
+        mc.innerHTML = `
+            <label>Date</label>
+            <input type="date" id="edit_date" value="${item.date}">
+            
+            <div class="edit-form-row">
+                <div>
+                    <label>Société</label>
+                    <input type="text" id="edit_societe" value="${item.societe}">
+                </div>
+                <div>
+                    <label>Nom Magasin</label>
+                    <input type="text" id="edit_nomMagasin" value="${item.nomMagasin}">
+                </div>
+                <div>
+                    <label>Code Magasin</label>
+                    <input type="text" id="edit_codeMagasin" value="${item.codeMagasin}">
+                </div>
+            </div>
+            
+            <div class="edit-form-row">
+                <div>
+                    <label>Code GOLD</label>
+                    <input type="text" id="edit_codeGold" value="${item.code}">
+                </div>
+                <div>
+                    <label>Code Ticket</label>
+                    <input type="text" id="edit_ticket" value="${item.ticket}">
+                </div>
+            </div>
+            
+            <label>Commentaire</label>
+            <input type="text" id="edit_commentaire" value="${item.commentaire || ''}">
+        `;
+
+        // Message informatif
+        const message = `Modifier la ligne encodée`;
+
+        // Utiliser showModal pour afficher la modale avec un bouton "Sauvegarder"
+        // Le callback appliquera la sauvegarde lors du clic sur "Sauvegarder"
+        showModal("Modifier ligne", message, () => {
+             // Récupère les valeurs depuis le formulaire de la modale
+             const nouvellesDonnees = {
+                 date: document.getElementById('edit_date').value || item.date,
+                 societe: document.getElementById('edit_societe').value.trim() || item.societe,
+                 nomMagasin: document.getElementById('edit_nomMagasin').value.trim() || item.nomMagasin,
+                 codeMagasin: document.getElementById('edit_codeMagasin').value.trim() || item.codeMagasin,
+                 code: document.getElementById('edit_codeGold').value.trim() || item.code,
+                 ticket: document.getElementById('edit_ticket').value.trim() || item.ticket,
+                 commentaire: document.getElementById('edit_commentaire').value.trim() || ''
+             };
+
+             // Vérification des champs requis (comme avant)
+             if (!nouvellesDonnees.societe || !nouvellesDonnees.nomMagasin ||
+                 !nouvellesDonnees.codeMagasin || !nouvellesDonnees.code || !nouvellesDonnees.ticket) {
+                 showModal("Erreur", "Tous les champs sont obligatoires sauf le commentaire.");
+                 return;
+             }
+
+             // Applique la sauvegarde
+             encodage[index] = nouvellesDonnees;
+             afficherTableau();
+             // La modale sera fermée automatiquement par showModal après le callback
+        }, true, 'Sauvegarder', false, true); // preserveContent = true pour garder le formulaire d'édition visible
+
+        // Après ouverture de la modale, transformer le bouton "modalTuto" en bouton Supprimer pour cette modale
+        // (on réutilise le bouton existant pour éviter de casser showModal)
+        const tutoBtn = document.getElementById('modalTuto');
+        if (tutoBtn) {
+            tutoBtn.style.display = 'inline-block';
+            tutoBtn.textContent = '🗑️ Supprimer';
+            // Le style 'danger' est appliqué par CSS !important
+            // tutoBtn.style.backgroundColor = '#f44336'; 
+            tutoBtn.onclick = () => {
+                // Fermer la modale d'édition puis confirmer suppression
+                closeModal();
+                showModal("Confirmation de suppression", "Voulez-vous vraiment supprimer cette ligne ?", () => {
+                    encodage.splice(index, 1);
+                    afficherTableau();
+                }, true, 'Oui, supprimer');
+            };
+        }
+
+        // Le bouton Retour (modalCancel) et le bouton Sauvegarder (modalConfirm) sont gérés par showModal
+        // On s'assure que modalCancel ferme la modale (défaut) — aucun changement nécessaire
+        // Affiche la modale (déjà affichée par showModal)
+    }
+    
+    function confirmerSuppression(index) {
+        showModal(
+            "Confirmation de suppression",
+            "Voulez-vous vraiment supprimer cette ligne ?",
+            () => {
+                encodage.splice(index, 1);
+                afficherTableau();
+                // ne plus appeler closeModal() ici : showModal fermera après le callback
+            },
+            true,
+            'Oui, supprimer'
+        );
+    }
+
+    function resetTable() {
+        // Confirmation simple avec le bouton OK (pas d'action Envoyer)
+      showModal("Confirmation de réinitialisation", "Êtes-vous sûr de vouloir tout effacer ? Cette action est irréversible.", () => {
+          encodage.length = 0;
+          afficherTableau();
+      }, true, 'Oui, réinitialiser');
+    }
+    
+    /**
+     * NOUVEAU : Fonction pour construire et ouvrir le client mail via mailto.
+     */
+    function ouvrirClientMail(fileName) {
+        const codeMagasin = document.getElementById(LS_MAGASIN_CODE).value.trim() || 'SANSCODE';
+
+        // 3. Préparation du lien mailto (destinataire, objet et corps)
+        const recipient = "9plus1@tomandco.com";
+        const subject = encodeURIComponent(`ENCODAGE CARTES 9+1 - ${codeMagasin}`);
+        
+        const mailBody = 
+            "Bonjour,\n\n" +
+            "Veuillez trouver ci-joint le fichier d'encodage des cartes 9+1 pour le magasin.\n\n" +
+            "=================================================================\n" +
+            "*** ATTENTION : N'OUBLIEZ PAS DE JOINDRE LE FICHIER EXCEL TÉLÉCHARGÉ ! ***\n" +
+            "Le fichier à joindre est : " + fileName + "\n" +
+            "=================================================================\n\n" +
+            "Merci pour votre travail.";
+            
+        const body = encodeURIComponent(mailBody);
+        
+        // Remplacement des retours à la ligne par '%0D%0A' pour mailto
+        const mailtoLink = `mailto:${recipient}?subject=${subject}&body=${body}`.replace(/\n/g, '%0D%0A');
+        
+        window.location.href = mailtoLink;
+        
+        // Message final pour informer l'utilisateur de ce qui vient de se passer
+        setTimeout(() => {
+             showModal("Email ouvert", "Votre client de messagerie a été lancé. N'oubliez pas d'attacher le fichier Excel (<b>" + fileName + "</b>) avant d'envoyer !", null, false, 'Compris');
+        }, 500); // Petit délai pour laisser le temps au mailto de se lancer
+    }
+
+    /**
+     * Tente d'envoyer le fichier par email en le téléchargeant d'abord,
+     * puis en ouvrant le client mail avec un message d'instruction.
+     */
+    function envoyerFichier() {
+      if (encodage.length === 0) return showModal("Alerte", "Aucune donnée à exporter.");
+      
+      // 1. Préparation des données pour le téléchargement
+      // NOUVEAU : Mise à jour des entêtes pour inclure Date et Commentaire
+      const rows = [
+        ["Date", "Société", "Nom Magasin", "Code Magasin", "Code GOLD", "Code Ticket", "Commentaire"], 
+        // NOUVEAU : Mise à jour du mappage pour inclure Date et Commentaire
+        ...encodage.map(e => [e.date, e.societe, e.nomMagasin, e.codeMagasin, e.code, e.ticket, e.commentaire || '']) 
+      ];
+      
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Encodage");
+      
+      const codeMagasin = document.getElementById(LS_MAGASIN_CODE).value.trim() || 'SANSCODE';
+      const fileName = `encodage_${codeMagasin}_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.xlsx`;
+      
+      // Stocke le nom du fichier pour utilisation par showTutoModal
+      lastGeneratedFileName = fileName;
+      
+      // 2. Téléchargement du fichier
+      try {
+        XLSX.writeFile(workbook, fileName);
+      } catch (e) {
+          console.error("Erreur de téléchargement:", e);
+          return showModal("Erreur", "Échec du téléchargement du fichier. Veuillez vérifier les permissions de votre navigateur.");
+      }
+      
+      // 3. Affichage du message d'instruction (avec le bouton qui lance le mailto)
+      const modalMessage = `
+        <b style="color:red;">FICHIER TÉLÉCHARGÉ !</b>
+        <br>
+        Le fichier d'extraction 9+1 (<b>${fileName}</b>) a été téléchargé dans votre dossier.
+        <br><br>
+        Cliquez sur <b>Envoyer 📧</b> pour lancer la préparation du message.
+        <br><br>
+        <b>⚠️ IMPORTANT : Vous DEVEZ attacher le fichier Excel téléchargé manuellement à l'email avant de l'envoyer.</b>
+      `;
+
+      // Ouverture du client mail après la confirmation de l'utilisateur
+      // showModal(title, message, callback, cancelable, confirmText, tutoVisible)
+      showModal("Action requise : Joindre le fichier", modalMessage, () => {
+        // Le callback appelle la nouvelle fonction qui s'occupe du mailto
+        ouvrirClientMail(fileName);
+      }, true, 'Envoyer 📧', true); // Envoyer (bleu) et bouton Tuto visible
+    }
+
+    // === Recherche et Filtres par Colonne ===
+    function ouvrirRecherche() {
+      if (articles.length === 0) return showModal("Alerte", "Veuillez attendre que la base Excel soit chargée.");
+      document.getElementById("popupRecherche").style.display = "block";
+      
+      const tableRecherche = document.getElementById("tableRecherche");
+      const thead = tableRecherche.querySelector("thead");
+      thead.innerHTML = ""; 
+
+      // Row 1: Titres des colonnes
+      const titleRow = document.createElement("tr");
+      headers.forEach(header => {
+          const th = document.createElement("th");
+          th.textContent = header;
+          titleRow.appendChild(th);
+      });
+      thead.appendChild(titleRow);
+
+      // Row 2: Inputs de filtre pour chaque colonne
+      const filterRow = document.createElement("tr");
+      filterRow.id = "filterRow";
+      headers.forEach(header => {
+          const th = document.createElement("th");
+          const input = document.createElement("input");
+          input.type = "text";
+          input.placeholder = `Filtrer ${header}`;
+          input.className = "column-filter-input";
+          input.dataset.column = header; 
+          input.oninput = filtrerArticles;
+          // Style pour les inputs de filtre
+          input.style.width = "95%";
+          input.style.padding = "8px";
+          input.style.fontSize = "0.9rem";
+          
+          th.appendChild(input);
+          filterRow.appendChild(th);
+      });
+      thead.appendChild(filterRow);
+      
+      // On lance le filtrage initial
+      filtrerArticles();
+    }
+
+    function fermerRecherche() {
+      document.getElementById("popupRecherche").style.display = "none";
+    }
+    
+    function filtrerArticles() {
+  const tbody = document.querySelector("#tableRecherche tbody");
+  tbody.innerHTML = "";
+
+  // Filtres par colonne (texte)
+  const activeFilters = {};
+  document.querySelectorAll('.column-filter-input').forEach(input => {
+      const column = input.dataset.column;
+      const value = String(input.value || "").toLowerCase().trim();
+      if (value) {
+          activeFilters[column] = value;
+      }
+  });
+
+  const filterKeys = Object.keys(activeFilters);
+
+  const articlesFiltres = articles.filter(a => {
+      return filterKeys.every(column => {
+          const articleValue = String(a[column] || a[column]?.toString?.() || "").toLowerCase();
+          return articleValue.includes(activeFilters[column]);
+      });
+  }).slice(0, 500); // Limiter pour performance
+
+  articlesFiltres.forEach(a => {
+    const row = document.createElement("tr");
+    row.style.cursor = "pointer";
+
+    headers.forEach(header => {
+        const td = document.createElement("td");
+        td.textContent = (a[header] !== undefined && a[header] !== null) ? a[header] : ""; 
+        row.appendChild(td);
+    });
+
+    row.onclick = () => {
+      document.getElementById("codeGold").value = a.GOLD_DISPLAY || a.GOLD || "";
+      fermerRecherche();
+    };
+    tbody.appendChild(row);
+  });
+}
+
+    /**
+     * Précharge la base de données.
+     * Priorité : base.json (plus rapide), fallback : base.xlsx (si présent côté serveur).
+     */
+    async function preloadBase() {
+        const baseXlsxUrl = BASE_EXCEL_FILENAME; // 'base.xlsx'
+        const baseJsonUrl = 'base.json';
+        const statutEl = document.getElementById('statutChargement');
+
+        // 1) Essayer base.xlsx en priorité (votre cas)
+        try {
+            const res = await fetch(baseXlsxUrl, { cache: "no-cache" });
+            if (res.ok) {
+                const arrayBuffer = await res.arrayBuffer();
+                await processExcelData(arrayBuffer, baseXlsxUrl);
+                console.log('Préchargé depuis base.xlsx');
+                return;
+            } else {
+                console.debug('base.xlsx introuvable sur le serveur, fallback vers base.json');
+            }
+        } catch (err) {
+            console.debug('Erreur lors du fetch de base.xlsx, fallback vers base.json', err);
+        }
+
+        // 2) Fallback : essayer base.json si présent
+        try {
+            const resJson = await fetch(baseJsonUrl, { cache: "no-cache" });
+            if (resJson.ok) {
+                const json = await resJson.json();
+                if (Array.isArray(json) && json.length > 0) {
+                    articles = json.map(row => ({ ...row, GOLD_DISPLAY: row.GOLD || row.GOLD_DISPLAY || '' }));
+                    headers = Object.keys(json[0]);
+                    statutEl.textContent = `✅ ${articles.length} articles chargés (base.json)`;
+                    statutEl.style.color = '#00594E';
+                    document.getElementById('btnLancerChargement').style.display = 'none';
+                    setContentVisibility(true);
+                    console.log('Préchargé depuis base.json');
+                    return;
+                }
+            }
+        } catch (e) {
+            console.debug('base.json non trouvée ou invalide');
+        }
+
+        // 3) Aucun fichier préchargé
+        statutEl.textContent = `(Aucune base préchargée)`;
+        statutEl.style.color = '#E56A54';
+    }
+
+  </script>
+</body>
+</html>
