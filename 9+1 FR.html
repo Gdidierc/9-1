@@ -233,12 +233,13 @@
     .chip{display:inline-flex; gap:8px; align-items:center; padding:8px 10px; border-radius:999px; background:#f4f7fb; font-weight:600; color:var(--primary);}
 
     /* Popup recherche */
-    .popup{position:fixed; top:8%; left:50%; transform:translateX(-50%); width:95%; max-width:980px; max-height:80%; overflow:auto; z-index:1050; border-radius:12px; display:none;}
-    .popup .card{margin:0; padding:14px; box-shadow: 0 10px 40px rgba(0,0,0,0.15);} /* Ombre plus forte */
+    .popup{position:fixed; top:6%; left:50%; transform:translateX(-50%); width:96%; max-width:1200px; max-height:88%; overflow:auto; z-index:1050; border-radius:12px; display:none;}
+    .popup .card{margin:0; padding:18px; box-shadow: 0 14px 48px rgba(0,0,0,0.18);} /* Ombre plus forte */
     .popup-header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
     .popup-header h3 { color: var(--primary); } /* Titre popup mis à jour */
     #tableRecherche{width:100%; border-collapse:collapse;}
-    #tableRecherche th, #tableRecherche td{padding:8px 10px; border-bottom:1px solid #eef3fb; font-size:0.9rem;}
+    #tableRecherche th, #tableRecherche td{padding:12px 14px; border-bottom:1px solid #eef3fb; font-size:1rem;}
+    #tableRecherche tbody{max-height:65vh;}
     #tableRecherche tbody tr{cursor:pointer;}
     #tableRecherche tbody tr:hover{background: #f0fafa; } /* Survol popup mis à jour */
 
@@ -319,19 +320,13 @@
 
           <hr style="border:none; height:1px; background:#f1f5f9; margin:14px 0;">
 
-          <!-- Champ commentaire (maintenant visible par défaut mais vide) -->
-          <div style="margin-bottom:8px;">
-            <label for="inputCommentaire">Commentaire (optionnel)</label>
-            <input type="text" id="inputCommentaire" placeholder="Ajoutez un commentaire..." onkeyup="checkEnter(event,'commentaire')" style="display: block;">
-            <!-- Le bouton pour afficher/cacher n'est plus nécessaire si on le laisse visible -->
-          </div>
-
           <div style="margin-bottom:12px;">
             <label for="codeGold">Code GOLD (sélectionné)</label>
             <div class="input-with-search-btn">
-              <input type="text" id="codeGold" placeholder="Cliquez sur Rechercher pour sélectionner" inputmode="numeric" pattern="[0-9]*">
+              <input type="text" id="codeGold" placeholder="Tapez un code ou recherchez un article" inputmode="numeric" pattern="[0-9]*" list="codeGoldList">
               <button id="btnRecherche" class="icon-btn search" onclick="ouvrirRecherche()" title="Rechercher un article">🔍</button>
             </div>
+            <datalist id="codeGoldList"></datalist>
           </div>
 
           <div style="margin-bottom:12px;">
@@ -342,9 +337,8 @@
 
           <div style="display:flex; gap:10px; align-items:center;">
             <button id="btnAdd" class="btn" onclick="ajouterLigne()">➕ Ajouter</button>
-            <button class="btn ghost small" onclick="resetTable()">♻️ Réinitialiser</button>
             <div style="flex:1"></div>
-            <div class="muted" style="font-size:0.9rem;">Astuce : scanner → Entrée pour ajouter</div>
+            <div id="selectedArticlePreview" class="muted" style="font-size:0.9rem;"></div>
           </div>
         </div>
       </div>
@@ -369,6 +363,8 @@
                 <th>Code Magasin</th>
                 <th>Code GOLD</th>
                 <th>Code ticket</th>
+                <th>Libellé article</th>
+                <th>Prix d'achat (€)</th>
                 <th>Commentaire</th>
                 <th style="width:70px; text-align:center;">Actions</th>
               </tr>
@@ -379,9 +375,12 @@
 
         <div class="actions-panel">
            <!-- Panneau d'actions réorganisé -->
-          <div style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button id="btnEnvoyer" class="btn" onclick="envoyerFichier()">📧 Envoyer</button>
+            <button id="btnReset" class="btn ghost small" onclick="resetTable()">♻️ Réinitialiser</button>
+            <button id="btnUndoReset" class="btn ghost small" onclick="undoReset()" disabled>↩️ Annuler</button>
             <div style="flex: 1;"></div>
+            <div id="totalAchat" class="muted" style="font-weight:600;">Total achats : 0,00 €</div>
             <!-- SUPPRESSION DES BOUTONS EDIT ET DELETE DE MASSE -->
           </div>
 
@@ -438,23 +437,32 @@
   <script>
     let encodage = [];
     let articles = [];
-    
+    let articleMapByGold = new Map();
+    let selectedArticle = null;
+    let encodageHistory = [];
+
+    const columnKeys = { gold: null, libelle: null, prix: null };
+
     // MODIFICATION 1 : Suppression de la duplication 'LIBELÉ CAISSE FR' et placement de NL à côté
     const REQUIRED_HEADERS_NORMALIZED = [
-        'GOLD', 'EAN', 'LIBELLE', 'MARQUE', 'PG', 'POID', 'FLOW', 
+        'GOLD', 'EAN', 'LIBELLE', 'MARQUE', 'PG', 'POID', 'FLOW',
         'LIBELLÉ CAISSE FR', 'LIBELLÉ CAISSE NL', 'CATEGORY DESCRIPTION'
     ];
-    let headers = []; 
-    
+    let headers = [];
+
     const BASE_EXCEL_FILENAME = 'base.xlsx';
-    
+
     // Constantes pour localStorage
     const LS_SOCIETE = 'societeNom';
     const LS_MAGASIN_NOM = 'magasinNom';
     const LS_MAGASIN_CODE = 'magasinCode';
+    const LS_ENCODAGE = 'encodageData';
+    const LS_ENCODAGE_BACKUP = 'encodageBackup';
+
+    const DEFAULT_PREVIEW_TEXT = 'Astuce : scanner → Entrée pour ajouter';
 
     // Variable pour stocker le nom du fichier généré temporairement, utilisée par showTutoModal
-    let lastGeneratedFileName = ''; 
+    let lastGeneratedFileName = '';
     
     // Fonction utilitaire pour obtenir la date au format YYYY-MM-DD
     function getDateDuJour() {
@@ -470,49 +478,10 @@
     // MODIFIÉ : Ajout du paramètre 'field' pour différencier les actions
     function checkEnter(event, field) {
         if (event.key === 'Enter') {
-            event.preventDefault(); // Empêche l'action par défaut
+            event.preventDefault();
             if (field === 'ticket') {
-                // Si Entrée sur le ticket, on bascule/ouvre le champ commentaire.
-                const commentInput = document.getElementById('inputCommentaire');
-                const commentValue = commentInput.value.trim();
-
-                // On ajoute toujours la ligne, que le commentaire soit vide ou non
-                // C'est le flux le plus rapide. L'utilisateur peut scanner, taper commentaire, scanner.
                 ajouterLigne();
-
-            } else if (field === 'commentaire') {
-                // Si Entrée sur le commentaire, on ajoute la ligne
-                ajouterLigne();
-                // On ramène le focus au ticket
-                document.getElementById("codeTicket").focus(); 
             }
-        }
-    }
-    
-    // NOUVELLE FONCTION pour basculer la visibilité du champ commentaire (Non utilisée si champ visible par défaut)
-    function toggleCommentaireInput(forceOpen = false) {
-        const input = document.getElementById('inputCommentaire');
-        // const btn = document.getElementById('btnToggleCommentaire'); (Bouton supprimé)
-
-        if (input.style.display === 'none' || forceOpen) {
-            input.style.display = 'block';
-        } else if (!forceOpen && input.value.trim() === '') {
-            // Cache seulement si le champ est vide et pas de forceOpen
-            input.style.display = 'none';
-        }
-        
-        // (Logique du bouton supprimée)
-    }
-    
-    // NOUVELLE FONCTION pour cacher le champ commentaire (Non utilisée si champ visible par défaut)
-    function hideCommentaireInputIfEmpty() {
-        const input = document.getElementById('inputCommentaire');
-        // const btn = document.getElementById('btnToggleCommentaire');
-        if (input.value.trim() === '') {
-            input.style.display = 'none';
-            // btn.classList.remove('has-comment');
-        } else {
-            // btn.classList.add('has-comment');
         }
     }
 
@@ -541,12 +510,339 @@
     // Masque le contenu d'encodage et le tableau au chargement initial
     document.addEventListener('DOMContentLoaded', () => {
         setContentVisibility(false);
-        // Initialise le champ commentaire comme visible par défaut
-        try { document.getElementById('inputCommentaire').style.display = 'block'; } catch(e){/* no comment input */ }
+
+        const preview = document.getElementById('selectedArticlePreview');
+        if (preview) preview.textContent = DEFAULT_PREVIEW_TEXT;
+
+        const codeGoldInput = document.getElementById('codeGold');
+        if (codeGoldInput) {
+            codeGoldInput.addEventListener('input', handleCodeGoldInput);
+            codeGoldInput.addEventListener('blur', validateCodeGoldInput);
+        }
+
+        loadEncodageFromStorage();
+        updateUndoButton();
 
         // Nouvelle précharge de la base (JSON ou fallback Excel)
         preloadBase();
     });
+
+    function normalizeCodeValue(code) {
+        return String(code ?? '').trim();
+    }
+
+    function parsePrix(value) {
+        if (value === null || value === undefined || value === '') return null;
+        if (typeof value === 'number') {
+            return Number.isFinite(value) ? value : null;
+        }
+        let normalized = String(value).replace(/\s/g, '');
+        normalized = normalized.replace(/[^0-9,.-]/g, '');
+
+        const hasComma = normalized.includes(',');
+        const hasDot = normalized.includes('.');
+
+        if (hasComma && hasDot) {
+            if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+                normalized = normalized.replace(/\./g, '');
+                normalized = normalized.replace(',', '.');
+            } else {
+                normalized = normalized.replace(/,/g, '');
+            }
+        } else if (hasComma) {
+            normalized = normalized.replace(',', '.');
+        }
+
+        const parsed = Number.parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function formatPrix(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return '0,00';
+        }
+        return number.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char] || char));
+    }
+
+    function getArticleLibelle(article) {
+        if (!article) return '';
+        if (article.LIBELLE_DISPLAY) return article.LIBELLE_DISPLAY;
+
+        const possibleKeys = [];
+        if (columnKeys.libelle) possibleKeys.push(columnKeys.libelle);
+        possibleKeys.push('LIBELLE', 'LIBELLÉ CAISSE FR', 'LIBELLE CAISSE FR', 'LIBELLE FR', 'LIBELLÉ ARTICLE');
+
+        for (const key of possibleKeys) {
+            if (!key) continue;
+            const value = article[key];
+            if (value !== undefined && value !== null && String(value).trim() !== '') {
+                return String(value);
+            }
+        }
+        return '';
+    }
+
+    function extractArticlePrix(article) {
+        if (!article) return null;
+        if (typeof article.PRIX_ACHAT_VALUE === 'number') return article.PRIX_ACHAT_VALUE;
+
+        const candidates = [];
+        if (columnKeys.prix && article[columnKeys.prix] !== undefined) {
+            candidates.push(article[columnKeys.prix]);
+        }
+
+        ['PRIX D\'ACHAT', 'PRIX D ACHAT', 'PRIXACHAT', 'PRIX ACHAT', 'PA', 'PA HT', 'PRIX NET'].forEach(key => {
+            if (article[key] !== undefined) {
+                candidates.push(article[key]);
+            }
+        });
+
+        for (const value of candidates) {
+            const parsed = parsePrix(value);
+            if (parsed !== null) return parsed;
+        }
+        return null;
+    }
+
+    function buildArticleMap() {
+        articleMapByGold = new Map();
+
+        articles.forEach(article => {
+            const code = normalizeCodeValue(article.GOLD_DISPLAY || article.GOLD || '');
+            if (!code) return;
+
+            article.LIBELLE_DISPLAY = getArticleLibelle(article);
+            article.PRIX_ACHAT_VALUE = extractArticlePrix(article);
+
+            if (!articleMapByGold.has(code)) {
+                articleMapByGold.set(code, article);
+            }
+
+            const numericValue = Number(code);
+            if (!Number.isNaN(numericValue)) {
+                const numericKey = normalizeCodeValue(numericValue);
+                if (numericKey && !articleMapByGold.has(numericKey)) {
+                    articleMapByGold.set(numericKey, article);
+                }
+            }
+        });
+
+        populateCodeDatalist();
+        refreshSelectedArticleFromInput();
+        enrichEncodageWithArticles();
+    }
+
+    function populateCodeDatalist() {
+        const datalist = document.getElementById('codeGoldList');
+        if (!datalist) return;
+
+        datalist.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        const seen = new Set();
+        const LIMIT = 1500;
+
+        for (let i = 0; i < articles.length && seen.size < LIMIT; i++) {
+            const article = articles[i];
+            const code = normalizeCodeValue(article.GOLD_DISPLAY || article.GOLD || '');
+            if (!code || seen.has(code)) continue;
+            seen.add(code);
+
+            const option = document.createElement('option');
+            option.value = code;
+            const libelle = getArticleLibelle(article);
+            const prix = article.PRIX_ACHAT_VALUE != null ? ` — ${formatPrix(article.PRIX_ACHAT_VALUE)} €` : '';
+            let label = `${code} — ${libelle}${prix}`.trim();
+            if (label.length > 200) {
+                label = `${label.slice(0, 197)}...`;
+            }
+            option.textContent = label;
+            fragment.appendChild(option);
+        }
+
+        datalist.appendChild(fragment);
+    }
+
+    function getArticleByGold(code) {
+        const normalized = normalizeCodeValue(code);
+        if (!normalized) return null;
+        return articleMapByGold.get(normalized) || null;
+    }
+
+    function handleCodeGoldInput(event) {
+        const code = normalizeCodeValue(event.target.value);
+        if (!code) {
+            setSelectedArticle(null);
+            return;
+        }
+
+        const article = getArticleByGold(code);
+        if (article) {
+            setSelectedArticle(article);
+        } else {
+            setSelectedArticle(null, code);
+        }
+    }
+
+    function validateCodeGoldInput() {
+        const input = document.getElementById('codeGold');
+        if (!input) return;
+        const code = normalizeCodeValue(input.value);
+        if (!code) {
+            setSelectedArticle(null);
+            return;
+        }
+
+        const article = getArticleByGold(code);
+        if (article) {
+            setSelectedArticle(article);
+        } else {
+            setSelectedArticle(null, code);
+        }
+    }
+
+    function refreshSelectedArticleFromInput() {
+        const input = document.getElementById('codeGold');
+        if (!input) return;
+        const code = normalizeCodeValue(input.value);
+        if (!code) {
+            setSelectedArticle(null);
+            return;
+        }
+        const article = getArticleByGold(code);
+        if (article) {
+            setSelectedArticle(article);
+        } else {
+            setSelectedArticle(null, code);
+        }
+    }
+
+    function setSelectedArticle(article, typedCode = '') {
+        selectedArticle = article || null;
+        const preview = document.getElementById('selectedArticlePreview');
+        if (!preview) return;
+
+        if (article) {
+            const code = normalizeCodeValue(article.GOLD_DISPLAY || article.GOLD || typedCode);
+            const libelle = article.LIBELLE_DISPLAY || getArticleLibelle(article) || 'Libellé indisponible';
+            const prix = article.PRIX_ACHAT_VALUE != null ? `${formatPrix(article.PRIX_ACHAT_VALUE)} €` : 'Prix indisponible';
+            preview.textContent = `${code} — ${libelle} (${prix})`;
+        } else if (typedCode) {
+            preview.textContent = `Code inconnu : ${typedCode}`;
+        } else {
+            preview.textContent = DEFAULT_PREVIEW_TEXT;
+        }
+    }
+
+    function updateTotalAchat() {
+        const totalEl = document.getElementById('totalAchat');
+        if (!totalEl) return;
+        const total = encodage.reduce((acc, item) => {
+            const value = Number(item.prixAchat);
+            return acc + (Number.isFinite(value) ? value : 0);
+        }, 0);
+        totalEl.textContent = `Total achats : ${formatPrix(total)} €`;
+    }
+
+    function saveEncodageToStorage() {
+        try {
+            if (encodage.length > 0) {
+                localStorage.setItem(LS_ENCODAGE, JSON.stringify(encodage));
+                clearEncodageBackup();
+            } else {
+                localStorage.removeItem(LS_ENCODAGE);
+            }
+        } catch (e) {
+            console.warn('Impossible de sauvegarder les données encodées.', e);
+        }
+        updateUndoButton();
+        updateTotalAchat();
+    }
+
+    function loadEncodageFromStorage() {
+        try {
+            const stored = localStorage.getItem(LS_ENCODAGE);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    encodage = parsed.map(item => ({
+                        ...item,
+                        libelle: item.libelle || '',
+                        prixAchat: item.prixAchat != null ? Number(item.prixAchat) : null,
+                        commentaire: item.commentaire || ''
+                    }));
+                }
+            }
+        } catch (e) {
+            console.warn('Impossible de charger les données encodées.', e);
+        }
+
+        afficherTableau();
+    }
+
+    function clearEncodageBackup() {
+        try {
+            localStorage.removeItem(LS_ENCODAGE_BACKUP);
+        } catch (e) {
+            console.warn('Impossible de nettoyer la copie de secours.', e);
+        }
+    }
+
+    function updateUndoButton() {
+        const btn = document.getElementById('btnUndoReset');
+        if (!btn) return;
+        let hasHistory = encodageHistory.length > 0;
+        if (!hasHistory) {
+            try {
+                hasHistory = Boolean(localStorage.getItem(LS_ENCODAGE_BACKUP));
+            } catch (e) {
+                hasHistory = false;
+            }
+        }
+        btn.disabled = !hasHistory;
+    }
+
+    function enrichEncodageWithArticles() {
+        if (!Array.isArray(encodage) || encodage.length === 0) {
+            updateTotalAchat();
+            return;
+        }
+
+        let modified = false;
+        encodage = encodage.map(item => {
+            const copie = { ...item };
+            const article = getArticleByGold(copie.code);
+            if (article) {
+                if (!copie.libelle) {
+                    copie.libelle = article.LIBELLE_DISPLAY || getArticleLibelle(article);
+                    modified = true;
+                }
+                const prixArticle = article.PRIX_ACHAT_VALUE;
+                if ((copie.prixAchat === null || copie.prixAchat === undefined || !Number.isFinite(Number(copie.prixAchat))) && prixArticle != null) {
+                    copie.prixAchat = prixArticle;
+                    modified = true;
+                }
+            }
+            return copie;
+        });
+
+        if (modified) {
+            saveEncodageToStorage();
+            afficherTableau();
+        } else {
+            updateTotalAchat();
+        }
+    }
 
     // === Gestion des infos Magasin (LocalStorage) ===
     function sauvegarderInfosMagasin() {
@@ -739,7 +1035,18 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
             .toUpperCase()
             .trim();
         // Retire les caractères non alphanumériques, y compris les espaces, pour l'identification des colonnes.
-        return normalized.replace(/[^A-Z0-9]/g, ''); 
+        return normalized.replace(/[^A-Z0-9]/g, '');
+    }
+
+    function findHeaderByCandidates(candidates, allHeaders) {
+        for (const candidate of candidates) {
+            const normalizedCandidate = normalizeKey(candidate);
+            const index = allHeaders.findIndex(header => normalizeKey(header).includes(normalizedCandidate));
+            if (index !== -1) {
+                return allHeaders[index];
+            }
+        }
+        return null;
     }
     
     // Fonction de traitement des données Excel 
@@ -808,8 +1115,16 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
         }
         
         const goldKey = headerMap[normalizeKey('GOLD')];
-        
-        if (!goldKey) { 
+
+        columnKeys.gold = goldKey || null;
+        columnKeys.libelle = findHeaderByCandidates([
+            'LIBELLÉ CAISSE FR', 'LIBELLE CAISSE FR', 'LIBELLE', 'LIBELLÉ FR', 'LIBELLE ARTICLE'
+        ], allHeaders);
+        columnKeys.prix = findHeaderByCandidates([
+            'PRIX D\'ACHAT', 'PRIX D ACHAT', 'PRIX ACHAT', 'PRIX NET', 'PA', 'PA HT'
+        ], allHeaders);
+
+        if (!goldKey) {
             document.getElementById('statutChargement').textContent = `❌ Colonne 'GOLD' manquante(s) dans ${fileName}.`;
             document.getElementById('statutChargement').style.color = '#E56A54';
             setContentVisibility(false);
@@ -820,9 +1135,13 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
         articles = json.map(row => {
             const article = { ...row };
             article.GOLD_DISPLAY = row[goldKey] || "";
+            article.LIBELLE_DISPLAY = getArticleLibelle(article);
+            article.PRIX_ACHAT_VALUE = extractArticlePrix(article);
             return article;
         });
-        
+
+        buildArticleMap();
+
         // 3. Afficher le statut de succès et le contenu du formulaire
         document.getElementById('statutChargement').textContent = `✅ ${articles.length} articles chargés (${fileName})`;
         document.getElementById('statutChargement').style.color = '#00594E';
@@ -879,38 +1198,50 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
       // 2. Récupération des infos Article/Ticket/Commentaire
       const code = document.getElementById("codeGold").value.trim();
       const ticket = document.getElementById("codeTicket").value.trim();
-      // NOUVEAU: On récupère le commentaire du champ visible
-      const commentaire = document.getElementById("inputCommentaire").value.trim(); 
 
       // Vérification des inputs pour s'assurer que ce sont bien des chiffres
       if (!/^\d*$/.test(code) || !/^\d*$/.test(ticket)) {
           return showModal("Alerte", "Les champs Code GOLD et Code ticket doivent contenir uniquement des chiffres.");
       }
-      
+
       if (articles.length === 0) return showModal("Alerte", "Veuillez charger la base Excel.");
-      if (!code) return showModal("Alerte", "Veuillez d'abord rechercher et sélectionner un Code GOLD."); 
+      if (!code) return showModal("Alerte", "Veuillez d'abord rechercher et sélectionner un Code GOLD.");
       if (!ticket) return showModal("Alerte", "Merci de remplir le champ Code ticket.");
-      
+
+      const article = getArticleByGold(code);
+      if (!article) {
+          setSelectedArticle(null, code);
+          return showModal("Alerte", "Code GOLD introuvable dans la base. Utilisez la recherche pour sélectionner un article valide.");
+      }
+
       // NOUVEAU : Récupération de la date du jour
       const dateEncodage = getDateDuJour();
-      
+
+      const libelle = article.LIBELLE_DISPLAY || getArticleLibelle(article);
+      const prixAchat = typeof article.PRIX_ACHAT_VALUE === 'number' ? article.PRIX_ACHAT_VALUE : null;
+
       // 3. Stockage de la ligne complète (avec date et commentaire)
-      encodage.push({ 
+      encodage.push({
           date: dateEncodage, // NOUVEAU
-          societe, 
-          nomMagasin, 
-          codeMagasin, 
-          code, 
-          ticket, 
-          commentaire // NOUVEAU
-      }); 
-      
+          societe,
+          nomMagasin,
+          codeMagasin,
+          code,
+          ticket,
+          libelle,
+          prixAchat,
+          commentaire: ''
+      });
+
       // 4. Réinitialisation des champs de l'article pour la prochaine ligne
       document.getElementById("codeGold").value = "";
       document.getElementById("codeTicket").value = "";
-      document.getElementById("inputCommentaire").value = ""; // Vider le commentaire
-      
+      setSelectedArticle(null);
+
+      saveEncodageToStorage();
       afficherTableau();
+
+      refreshSelectedArticleFromInput();
 
       // IMPORTANT: Remettre le focus sur le champ Code ticket pour l'encodage continu au scanner
       document.getElementById("codeTicket").focus();
@@ -921,6 +1252,7 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
         if (encodage[index]) {
             encodage[index].commentaire = newComment.trim();
             console.log(`Commentaire ligne ${index} mis à jour.`);
+            saveEncodageToStorage();
         }
     }
 
@@ -930,29 +1262,35 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
       const tbody = document.querySelector("#tableau tbody");
       tbody.innerHTML = "";
 
-      encodage.forEach((ligne, index) => {
+      for (let index = encodage.length - 1; index >= 0; index--) {
+        const ligne = encodage[index];
         const row = document.createElement("tr");
         row.dataset.index = index;
-        
-        // SUPPRESSION de la case à cocher pour la sélection multiple
+
+        const prixFormat = ligne.prixAchat != null && ligne.prixAchat !== ''
+          ? `${formatPrix(ligne.prixAchat)} €`
+          : '';
+
         row.innerHTML = `
-          <td>${ligne.date}</td>
-          <td>${ligne.societe}</td>
-          <td>${ligne.nomMagasin}</td>
-          <td>${ligne.codeMagasin}</td>
-          <td>${ligne.code}</td>
-          <td>${ligne.ticket}</td>
+          <td>${ligne.date || ''}</td>
+          <td>${ligne.societe || ''}</td>
+          <td>${ligne.nomMagasin || ''}</td>
+          <td>${ligne.codeMagasin || ''}</td>
+          <td>${ligne.code || ''}</td>
+          <td>${ligne.ticket || ''}</td>
+          <td>${ligne.libelle ? escapeHtml(ligne.libelle) : ''}</td>
+          <td>${prixFormat}</td>
           <td class="comment-cell">
-            <textarea 
-              onchange="updateComment(${index}, this.value)" 
+            <textarea
+              onchange="updateComment(${index}, this.value)"
               placeholder="Ajouter un commentaire..."
               rows="1"
               style="width: 100%; min-height: 40px; padding: 5px; border-radius: 6px; border: 1px solid #e0e0e0;"
-            >${ligne.commentaire || ''}</textarea>
+            >${escapeHtml(ligne.commentaire || '')}</textarea>
           </td>
           <td style="padding: 5px; text-align: center; width: 50px;">
-            <button 
-              onclick="modifierLigne(${index})" 
+            <button
+              onclick="modifierLigne(${index})"
               class="btn ghost small"
               style="width: 38px; height: 38px; padding: 0; font-size: 1.1em; margin: 0;"
               title="Modifier cette ligne"
@@ -961,9 +1299,9 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
         `;
 
         tbody.appendChild(row);
-      });
+      }
 
-      // SUPPRESSION de l'appel à updateButtons()
+      updateTotalAchat();
     }
 
     // NOUVELLE FONCTION: éditer une ligne encodée
@@ -1002,9 +1340,20 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
                     <input type="text" id="edit_ticket" value="${item.ticket}">
                 </div>
             </div>
-            
+
+            <div class="edit-form-row">
+                <div>
+                    <label>Libellé article</label>
+                    <input type="text" id="edit_libelle" value="${escapeHtml(item.libelle || '')}">
+                </div>
+                <div>
+                    <label>Prix d'achat (€)</label>
+                    <input type="number" step="0.01" min="0" id="edit_prixAchat" value="${item.prixAchat != null ? item.prixAchat : ''}">
+                </div>
+            </div>
+
             <label>Commentaire</label>
-            <input type="text" id="edit_commentaire" value="${item.commentaire || ''}">
+            <input type="text" id="edit_commentaire" value="${escapeHtml(item.commentaire || '')}">
         `;
 
         // Message informatif
@@ -1021,6 +1370,8 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
                  codeMagasin: document.getElementById('edit_codeMagasin').value.trim() || item.codeMagasin,
                  code: document.getElementById('edit_codeGold').value.trim() || item.code,
                  ticket: document.getElementById('edit_ticket').value.trim() || item.ticket,
+                 libelle: document.getElementById('edit_libelle').value.trim(),
+                 prixAchat: parsePrix(document.getElementById('edit_prixAchat').value),
                  commentaire: document.getElementById('edit_commentaire').value.trim() || ''
              };
 
@@ -1031,8 +1382,28 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
                  return;
              }
 
+             if (!/^\d*$/.test(nouvellesDonnees.code) || !/^\d*$/.test(nouvellesDonnees.ticket)) {
+                 showModal("Erreur", "Les champs Code GOLD et Code ticket doivent contenir uniquement des chiffres.");
+                 return;
+             }
+
+             const articleAssocie = getArticleByGold(nouvellesDonnees.code);
+             if (!articleAssocie) {
+                 showModal("Erreur", "Code GOLD introuvable dans la base. Veuillez sélectionner un code valide.");
+                 return;
+             }
+
+             if (!nouvellesDonnees.libelle) {
+                 nouvellesDonnees.libelle = articleAssocie.LIBELLE_DISPLAY || getArticleLibelle(articleAssocie);
+             }
+
+             if (nouvellesDonnees.prixAchat === null && articleAssocie.PRIX_ACHAT_VALUE != null) {
+                 nouvellesDonnees.prixAchat = articleAssocie.PRIX_ACHAT_VALUE;
+             }
+
              // Applique la sauvegarde
              encodage[index] = nouvellesDonnees;
+             saveEncodageToStorage();
              afficherTableau();
              // La modale sera fermée automatiquement par showModal après le callback
         }, true, 'Sauvegarder', false, true); // preserveContent = true pour garder le formulaire d'édition visible
@@ -1050,6 +1421,7 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
                 closeModal();
                 showModal("Confirmation de suppression", "Voulez-vous vraiment supprimer cette ligne ?", () => {
                     encodage.splice(index, 1);
+                    saveEncodageToStorage();
                     afficherTableau();
                 }, true, 'Oui, supprimer');
             };
@@ -1066,6 +1438,7 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
             "Voulez-vous vraiment supprimer cette ligne ?",
             () => {
                 encodage.splice(index, 1);
+                saveEncodageToStorage();
                 afficherTableau();
                 // ne plus appeler closeModal() ici : showModal fermera après le callback
             },
@@ -1075,11 +1448,53 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
     }
 
     function resetTable() {
-        // Confirmation simple avec le bouton OK (pas d'action Envoyer)
-      showModal("Confirmation de réinitialisation", "Êtes-vous sûr de vouloir tout effacer ? Cette action est irréversible.", () => {
-          encodage.length = 0;
-          afficherTableau();
-      }, true, 'Oui, réinitialiser');
+        if (encodage.length === 0) {
+            showModal("Information", "Aucune donnée à réinitialiser.");
+            return;
+        }
+
+        showModal("Confirmation de réinitialisation", "Êtes-vous sûr de vouloir tout effacer ? Vous pourrez annuler cette action immédiatement après.", () => {
+            const snapshot = JSON.parse(JSON.stringify(encodage));
+            encodageHistory.push(snapshot);
+            try {
+                localStorage.setItem(LS_ENCODAGE_BACKUP, JSON.stringify(snapshot));
+            } catch (e) {
+                console.warn('Impossible de sauvegarder la copie de secours.', e);
+            }
+
+            encodage = [];
+            saveEncodageToStorage();
+            afficherTableau();
+            updateUndoButton();
+        }, true, 'Oui, réinitialiser');
+    }
+
+    function undoReset() {
+        let snapshot = encodageHistory.pop();
+
+        if (!snapshot || snapshot.length === 0) {
+            try {
+                const backup = localStorage.getItem(LS_ENCODAGE_BACKUP);
+                if (backup) {
+                    snapshot = JSON.parse(backup);
+                }
+            } catch (e) {
+                console.warn('Impossible de récupérer la copie de secours.', e);
+            }
+        }
+
+        if (!snapshot || snapshot.length === 0) {
+            updateUndoButton();
+            showModal("Information", "Aucune réinitialisation récente à annuler.");
+            return;
+        }
+
+        encodage = snapshot.map(item => ({ ...item }));
+        saveEncodageToStorage();
+        afficherTableau();
+        clearEncodageBackup();
+        updateUndoButton();
+        showModal("Information", "Les données supprimées ont été restaurées.");
     }
     
     /**
@@ -1124,9 +1539,18 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
       // 1. Préparation des données pour le téléchargement
       // NOUVEAU : Mise à jour des entêtes pour inclure Date et Commentaire
       const rows = [
-        ["Date", "Société", "Nom Magasin", "Code Magasin", "Code GOLD", "Code Ticket", "Commentaire"], 
-        // NOUVEAU : Mise à jour du mappage pour inclure Date et Commentaire
-        ...encodage.map(e => [e.date, e.societe, e.nomMagasin, e.codeMagasin, e.code, e.ticket, e.commentaire || '']) 
+        ["Date", "Société", "Nom Magasin", "Code Magasin", "Code GOLD", "Code Ticket", "Libellé article", "Prix d'achat (€)", "Commentaire"],
+        ...encodage.map(e => [
+            e.date,
+            e.societe,
+            e.nomMagasin,
+            e.codeMagasin,
+            e.code,
+            e.ticket,
+            e.libelle || '',
+            e.prixAchat != null ? formatPrix(e.prixAchat) : '',
+            e.commentaire || ''
+        ])
       ];
       
       const worksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -1247,8 +1671,17 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
     });
 
     row.onclick = () => {
-      document.getElementById("codeGold").value = a.GOLD_DISPLAY || a.GOLD || "";
+      const codeInput = document.getElementById("codeGold");
+      const ticketInput = document.getElementById("codeTicket");
+      const codeValue = a.GOLD_DISPLAY || a.GOLD || "";
+      if (codeInput) {
+          codeInput.value = codeValue;
+      }
+      setSelectedArticle(a);
       fermerRecherche();
+      if (ticketInput) {
+          ticketInput.focus();
+      }
     };
     tbody.appendChild(row);
   });
@@ -1286,10 +1719,18 @@ function showModal(title, message, callback = null, cancelable = true, confirmTe
                 if (Array.isArray(json) && json.length > 0) {
                     articles = json.map(row => ({ ...row, GOLD_DISPLAY: row.GOLD || row.GOLD_DISPLAY || '' }));
                     headers = Object.keys(json[0]);
+                    columnKeys.gold = columnKeys.gold || findHeaderByCandidates(['GOLD'], headers) || 'GOLD';
+                    columnKeys.libelle = columnKeys.libelle || findHeaderByCandidates([
+                        'LIBELLÉ CAISSE FR', 'LIBELLE CAISSE FR', 'LIBELLE', 'LIBELLÉ FR', 'LIBELLE ARTICLE'
+                    ], headers);
+                    columnKeys.prix = columnKeys.prix || findHeaderByCandidates([
+                        'PRIX D\'ACHAT', 'PRIX D ACHAT', 'PRIX ACHAT', 'PRIX NET', 'PA', 'PA HT'
+                    ], headers);
                     statutEl.textContent = `✅ ${articles.length} articles chargés (base.json)`;
                     statutEl.style.color = '#00594E';
                     document.getElementById('btnLancerChargement').style.display = 'none';
                     setContentVisibility(true);
+                    buildArticleMap();
                     console.log('Préchargé depuis base.json');
                     return;
                 }
